@@ -10,9 +10,11 @@ import org.hibernate.query.QueryParameter;
 import pl.sda.domain.Department;
 import pl.sda.domain.Employee;
 
+import javax.enterprise.inject.spi.Producer;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
 /**
  * Created by pzawa on 02.02.2017.
@@ -34,15 +36,25 @@ public class EmpDAOImpl implements EmpDAO {
         }
     }
 
+    public <T> T getInTransaction(Function<Session, T> work) {
+        T result = null;
+        Transaction tx = null;
+        try (Session session = sessionFactory.openSession()) {
+            result = work.apply(session);
+        }
+        return result;
+    }
+
     public EmpDAOImpl(SessionFactory sessionFactory) {
         this.sessionFactory = sessionFactory;
     }
 
     @Override
     public Employee findById(int id) throws Exception {
-        try (Session session = sessionFactory.openSession()) {
-            return session.find(Employee.class, id);
-        }
+        return getInTransaction(session -> session.find(Employee.class, id));
+//        try (Session session = sessionFactory.openSession()) {
+//            return session.find(Employee.class, id);
+//        }
     }
 
     @Override
@@ -52,55 +64,25 @@ public class EmpDAOImpl implements EmpDAO {
 
     @Override
     public void update(Employee employee) throws Exception {
-        Transaction tx = null;
-        try (Session session = sessionFactory.openSession()) {
-            tx = session.beginTransaction();
-            session.update(employee);
-            tx.commit();
-        } catch (Exception ex) {
-            if (tx != null && !tx.getRollbackOnly()) {
-                tx.rollback();
-            }
-            throw ex;
-        }
+        doInTransaction(session -> session.update(employee));
     }
 
     @Override
     public void delete(int id) throws Exception {
-        Transaction tx = null;
-        try (Session session = sessionFactory.openSession()) {
-            tx = session.beginTransaction();
+        doInTransaction(session -> {
             Employee emp = session.find(Employee.class, id);
             session.delete(emp);
-            tx.commit();
-        } catch (Exception ex) {
-            if (tx != null && !tx.getRollbackOnly()) {
-                tx.rollback();
-            }
-            throw ex;
-        }
+        });
     }
 
     @Override
     public void create(List<Employee> employees) throws Exception {
-        Transaction tx = null;
-        try (Session session = sessionFactory.openSession()) {
-            tx = session.beginTransaction();
-
-            employees.forEach(session::persist);
-
-            tx.commit();
-        } catch (Exception ex) {
-            if (tx != null && !tx.getRollbackOnly()) {
-                tx.rollback();
-            }
-            throw ex;
-        }
+        doInTransaction(session -> employees.forEach(session::persist));
     }
 
     @Override
     public BigDecimal getTotalSalaryByDept(int dept) throws Exception {
-        try (Session session = sessionFactory.openSession()) {
+        return getInTransaction(session -> {
             Query<BigDecimal> query = session
                     .createQuery("select sum(salary) " +
                             "from Employee " +
@@ -108,29 +90,26 @@ public class EmpDAOImpl implements EmpDAO {
             query.setParameter("dept", dept);
             List<BigDecimal> departments = query.list();
             return departments.get(0);
-        }
+        });
     }
 
     @Override
     public List<Employee> getEmployeesByDept(int deptNo) {
-        try (Session session = sessionFactory.openSession()) {
+        return getInTransaction(session -> {
             Criteria cr = session.createCriteria(Employee.class);
             cr.add(Restrictions.eq("dept.deptno", deptNo));
             cr.setResultTransformer(Criteria.DISTINCT_ROOT_ENTITY);
             return cr.list();
-        }
+        });
     }
 
     @Override
     public List<Employee> getEmployeeByName(String ename) {
-        try (Session session = sessionFactory.openSession()) {
+        return getInTransaction(session -> {
             Query<Employee> query = session
                     .createQuery("from Employee where ename = :ename", Employee.class);
             query.setParameter("ename", ename);
             return query.list();
-        }
+        });
     }
-
-
-
 }
