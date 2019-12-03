@@ -1,11 +1,11 @@
 package pl.sda.dao;
 
-import pl.sda.domain.Department;
 import pl.sda.domain.Employee;
 
 import javax.persistence.EntityManager;
 import javax.persistence.EntityManagerFactory;
 import javax.persistence.EntityTransaction;
+import javax.persistence.TypedQuery;
 import java.math.BigDecimal;
 import java.util.List;
 
@@ -66,7 +66,6 @@ public class EmpDAOJpaImpl implements EmpDAO {
         } finally {
             em.close();
         }
-
     }
 
     @Override
@@ -110,19 +109,39 @@ public class EmpDAOJpaImpl implements EmpDAO {
 
     @Override
     public BigDecimal getTotalSalaryByDept(int dept) {
-        // TODO: implement method
-        return null;
+        EntityManager em = emf.createEntityManager();
+        try {
+            TypedQuery<BigDecimal> query = em.createQuery("select sum(salary) from Employee where dept.deptno = :dept", BigDecimal.class);
+            query.setParameter("dept", dept);
+            return query.getSingleResult();
+        } finally {
+            em.close();
+        }
     }
 
     @Override
     public List<Employee> getEmployeesByDept(int deptNo) {
-        // TODO: implement method
-        return null;
+        EntityManager em = emf.createEntityManager();
+        try {
+            TypedQuery<Employee> query = em
+                    .createQuery("from Employee where dept.deptno = :deptNo", Employee.class);
+            query.setParameter("deptNo", deptNo);
+            return query.getResultList();
+        } finally {
+            em.close();
+        }
     }
 
     @Override
     public List<Employee> getEmployeeByName(String ename) {
-        // TODO: implement method
-        return null;
+        EntityManager em = emf.createEntityManager();
+        try {
+            TypedQuery<Employee> query = em
+                    .createQuery("from Employee where ename = :ename", Employee.class);
+            query.setParameter("ename", ename);
+            return query.getResultList();
+        } finally {
+            em.close();
+        }
     }
 }
